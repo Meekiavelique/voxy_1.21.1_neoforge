@@ -1,2 +1,4 @@
-# Voxy Backport for Minecraft 1.21.1 (Fabric)
+# Voxy Backport for Minecraft 1.21.1 (NEOFORGE)
 ## PLEASE FOR THE LOVE OF GOD DON'T BOTHER THE FINE PEOPLE ON CORTEX DISCORD WITH BUGS RELATING TO THIS, NO SUPPORT FOR BACKPORTS WILL BE GIVEN
+
+Get support in : https://discord.gg/avSH2JTfef
