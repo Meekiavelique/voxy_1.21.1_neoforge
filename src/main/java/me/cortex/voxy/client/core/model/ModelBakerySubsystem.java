@@ -44,7 +44,7 @@ public class ModelBakerySubsystem {
 
     public void tick(long totalBudget) {
         long start = System.nanoTime();
-        this.factory.tickAndProcessUploads();
+        this.factory.processUploads();
         //Always do 1 iteration minimum
         Integer i = this.blockIdQueue.poll();
         if (i != null) {

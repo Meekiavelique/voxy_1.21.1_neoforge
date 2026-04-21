@@ -5,12 +5,10 @@ import com.google.gson.reflect.TypeToken;
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonWriter;
 import me.cortex.voxy.common.Logger;
-import net.fabricmc.loader.api.FabricLoader;
-
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
+import java.io.*;
+import java.net.URL;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.nio.file.Files;
@@ -95,9 +93,30 @@ public class Serialization {
         Map<Class<?>, GsonConfigSerialization<?>> serializers = new HashMap<>();
 
         Set<String> clazzs = new LinkedHashSet<>();
-        var path = FabricLoader.getInstance().getModContainer("voxy").get().getRootPaths().get(0);
-        clazzs.addAll(collectAllClasses(path, BASE_SEARCH_PACKAGE));
-        clazzs.addAll(collectAllClasses(BASE_SEARCH_PACKAGE));
+        try {
+            var modFile = net.neoforged.fml.ModList.get().getModFileById("voxy");
+            if (modFile != null) {
+                Path pkgRoot = modFile.getFile().findResource(BASE_SEARCH_PACKAGE.replace('.', '/'));
+                if (pkgRoot != null && Files.exists(pkgRoot)) {
+                    try (var stream = Files.walk(pkgRoot)) {
+                        stream.filter(p -> p.getFileName() != null
+                                        && p.getFileName().toString().endsWith(".class"))
+                                .forEach(p -> {
+                                    String rel = pkgRoot.relativize(p).toString()
+                                            .replace('/', '.')
+                                            .replace('\\', '.');
+                                    rel = rel.substring(0, rel.length() - ".class".length());
+                                    clazzs.add(BASE_SEARCH_PACKAGE + "." + rel);
+                                });
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Logger.error("Failed to collect classes via ModList", e);
+        }
+        if (clazzs.isEmpty()) {
+            clazzs.addAll(collectAllClasses(BASE_SEARCH_PACKAGE));
+        }
         int count = 0;
         outer:
         for (var clzName : clazzs) {
@@ -166,6 +185,7 @@ public class Serialization {
         try {
             InputStream stream = Serialization.class.getClassLoader()
                     .getResourceAsStream(pack.replaceAll("[.]", "/"));
+            if (stream == null) return List.of();
             BufferedReader reader = new BufferedReader(new InputStreamReader(stream));
             return reader.lines().flatMap(inner -> {
                 if (inner.endsWith(".class")) {
@@ -181,22 +201,42 @@ public class Serialization {
             return List.of();
         }
     }
-    private static List<String> collectAllClasses(Path base, String pack) {
-        if (!Files.exists(base.resolve(pack.replaceAll("[.]", "/")))) {
-            return List.of();
-        }
+    private static List<String> collectAllClasses(File file, String pack) {
+        List<String> classes = new ArrayList<>();
         try {
-            return Files.list(base.resolve(pack.replaceAll("[.]", "/"))).flatMap(inner -> {
-                if (inner.getFileName().toString().endsWith(".class")) {
-                    return Stream.of(pack + "." + inner.getFileName().toString().replace(".class", ""));
-                } else if (Files.isDirectory(inner)) {
-                    return collectAllClasses(base, pack + "." + inner.getFileName()).stream();
-                } else {
-                    return Stream.of();
+            if (file.isDirectory()) {
+                Path base = file.toPath();
+                Path packPath = base.resolve(pack.replaceAll("[.]", "/"));
+                if (!Files.exists(packPath)) return List.of();
+                return Files.list(packPath).flatMap(inner -> {
+                    if (inner.getFileName().toString().endsWith(".class")) {
+                        return Stream.of(pack + "." + inner.getFileName().toString().replace(".class", ""));
+                    } else if (Files.isDirectory(inner)) {
+                        return collectAllClasses(file, pack + "." + inner.getFileName()).stream();
+                    } else {
+                        return Stream.of();
+                    }
+                }).collect(Collectors.toList());
+            } else if (file.getName().endsWith(".jar")) {
+                String packPath = pack.replace('.', '/') + '/';
+                try (JarFile jarFile = new JarFile(file)) {
+                    Enumeration<JarEntry> entries = jarFile.entries();
+                    while (entries.hasMoreElements()) {
+                        JarEntry entry = entries.nextElement();
+                        String entryName = entry.getName();
+                        if (entryName.endsWith(".class") && entryName.startsWith(packPath)) {
+                            String className = entryName.substring(0, entryName.length() - 6).replace('/', '.');
+                            classes.add(className);
+                        }
+                    }
                 }
-            }).collect(Collectors.toList());
+            }
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            Logger.error("Failed to collect classes from " + file, e);
         }
+        return classes;
+    }
+    private static List<String> collectAllClasses(Path base, String pack) {
+        return collectAllClasses(base.toFile(), pack);
     }
 }

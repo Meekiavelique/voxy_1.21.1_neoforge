@@ -1,6 +1,5 @@
 package me.cortex.voxy.client;
 
-import me.cortex.voxy.client.compat.FlashbackCompat;
 import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.client.mixin.sodium.AccessorSodiumWorldRenderer;
 import me.cortex.voxy.common.Logger;
@@ -30,11 +29,8 @@ public class VoxyClientInstance extends VoxyInstance {
     private final boolean noIngestOverride;
     public VoxyClientInstance() {
         super();
-        var path = FlashbackCompat.getReplayStoragePath();
-        this.noIngestOverride = path != null;
-        if (path == null) {
-            path = getBasePath();
-        }
+        var path = getBasePath();
+        this.noIngestOverride = false;
         this.basePath = path;
         this.storageConfig = StorageConfigUtil.getCreateStorageConfig(Config.class, c->c.version==1&&c.sectionStorageConfig!=null, ()->DEFAULT_STORAGE_CONFIG, path).sectionStorageConfig;
         this.updateDedicatedThreads();
