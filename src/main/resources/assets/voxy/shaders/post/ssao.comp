@@ -7,7 +7,7 @@ layout(binding = 1) uniform sampler2D depthTex;
 layout(binding = 2) uniform sampler2D colourTex;
 layout(location = 3) uniform mat4 MVP;
 layout(location = 4) uniform mat4 invMVP;
-ivec2 size;
+layout(location = 5) uniform ivec2 size;
 
 vec3 rev3d(vec3 clip) {
     vec4 view = invMVP * vec4(clip*2.0-1.0,1.0);
@@ -66,11 +66,10 @@ vec3 face2norm(uint face) {
 }
 
 void main() {
-    size = imageSize(colourTexOut);//TODO: dont use imageSize as it is slow, swap for uniform
-    if (any(lessThanEqual(size, gl_GlobalInvocationID.xy))) {
+    if (any(lessThanEqual(size, ivec2(gl_GlobalInvocationID.xy)))) {
         return;
     }
-    vec2 scale = vec2(1.0f)/size;
+    vec2 scale = vec2(1.0f)/vec2(size);
     vec2 point = vec2(gl_GlobalInvocationID.xy)*scale;
     point += scale*0.5f;//Offset to the center of the textile
     float depth = texture(depthTex, point).r;
